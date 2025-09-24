@@ -39,7 +39,7 @@ class AssetsController {
         pageRanges: "1",
         });
         const a=Buffer.from(pdfBuffer).toString("base64");
-        res.json({data:a});
+        res.json({data:a})
         await browser.close();
         return pdfBuffer;
     }
@@ -48,6 +48,8 @@ class AssetsController {
    
 
 
+
+    
     
 
     
