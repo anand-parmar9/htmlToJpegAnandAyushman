@@ -7,7 +7,6 @@ class GeneratePdfService {
     thermalPageSize;
     
     constructor() {
-        console.log("1.......")
         const customPageSize = {
             width: '4in',
             height: '6in',
@@ -34,10 +33,11 @@ class GeneratePdfService {
         this.launchBrowser(); // Launch the browser during object creation
     }
 
-    async launchBrowser() {
+   async launchBrowser() {
         try {
             this.browser = await puppeteer.launch({
                 headless: 'new',
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
