@@ -3,7 +3,7 @@ import { assetsController } from "../controller/AssetsController.js";
 const apiRoutes = express.Router();
 
 apiRoutes.post('/shipment', (req, res) => {
-    assetsController.generateLabel(req, res)
+    assetsController.convertHtmlToPdf(req, res)
 });
 
 export default apiRoutes;
