@@ -4,7 +4,8 @@ import bodyParser from "body-parser";
 import apiRoutes from './routes/index.js';
 const app=express();
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended: false }));//
+//app.use(express.text({ type: '*/*' }));
 app.use(bodyParser.json());
 app.use(async (err, req, res, next) => {
 
