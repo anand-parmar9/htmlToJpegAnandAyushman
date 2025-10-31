@@ -2,6 +2,21 @@ import express from 'express';
 import cors from "cors";
 import bodyParser from "body-parser";
 import apiRoutes from './routes/index.js';
+import dotenv from "dotenv";
+dotenv.config();
+
+const NODE_ENVIRMENT = process.env.NODE_ENV;
+switch (NODE_ENVIRMENT) {
+    case 'development':
+        dotenv.config({ path: '.envdev', override: true });
+        break;
+    case 'staging':
+        dotenv.config({ path: '.envstage', override: true });
+        break;
+    default:
+        dotenv.config({ path: '.envprod', override: true });
+        break;
+}
 const app=express();
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));//
@@ -53,7 +68,6 @@ app.use((req, res, next) => {
     }
     errorRes(res, response.message, HttpStatusCode.NOT_FOUND);
 });
-app.listen(8080, () => {
-       // registerSQSSubscriber.activateAfter10Sc();
-        console.log(`server started at http://:${8080}`);
-});
+const port = process.env.PORT || 8080;
+
+app.listen(port, "0.0.0.0", () => console.log(`Listening on ${port}`));
