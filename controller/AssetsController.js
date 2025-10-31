@@ -81,62 +81,75 @@ class AssetsController {
 
 
     async htmlToJpeg(req, res) {
+        console.log("Rendering the .a4 flyer container to A4 PNG...");
+        const html = req.body?.html;
+
+        if (!html) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing 'html' field in request body.",
+            });
+        }
+
+        let browser;
         try {
-            const htmlContent = req.body.html;
-            const mmToPx = (mm, dpi = 300) => (mm / 25.4) * dpi;
-            if (!htmlContent) {
-                return res.status(400).json({ status: "error", message: "Missing 'html' in body" });
-            }
-
-            console.log(" Rendering the .a4 flyer container to A4 PNG.");
-
-            const browser = await puppeteer.launch({
+            browser = await puppeteer.launch({
                 headless: true,
                 executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox'
-                ],
+                args: ["--no-sandbox", "--disable-setuid-sandbox"],
             });
+
             const page = await browser.newPage();
+            const mmToPx = (mm, dpi = 900) => (mm / 25.4) * dpi;
 
-            await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+            // :one: Load the HTML
+            await page.setContent(html, { waitUntil: "networkidle0" });
 
-            await page.waitForSelector(".a4", { visible: true });
-            
+            // :two: Wait for main flyer container (.a4)
+            let a4Found = null;
+            try {
+                a4Found = await page.waitForSelector(".a4", { visible: true, timeout: 10000 });
+            } catch {
+                console.warn("⚠️ Warning: .a4 element not found — using <body> instead.");
+            }
 
-            const widthPx = Math.round(mmToPx(210)); 
+            // :three: Convert millimeters → pixels
+            const widthPx = Math.round(mmToPx(210)); // ~2480 px at 300 DPI
+
             const flyerHeight = await page.evaluate(() => {
-                const el = document.querySelector(".a4");
+                const el = document.querySelector(".a4") || document.body;
                 return el ? el.scrollHeight : document.body.scrollHeight;
             });
+
             const heightPx = Math.round(flyerHeight);
+            console.log(`📐 A4 size: ${widthPx} × ${heightPx} px`);
 
-            console.log(`A4 size: ${widthPx} × ${heightPx}px`);
-
+            // :four: Set viewport to A4 size
             await page.setViewport({
                 width: widthPx,
                 height: heightPx,
                 deviceScaleFactor: 1,
             });
 
+            // :five: Ensure white background
             await page.evaluate(() => {
                 document.body.style.margin = "0";
-                document.body.style.background = "#FFF";
+                document.body.style.background = "#FFFFFF";
                 const a4 = document.querySelector(".a4");
                 if (a4) {
                     a4.style.margin = "0";
-                    a4.style.background = "#FFF";
+                    a4.style.background = "#FFFFFF";
                 }
             });
 
+            // :six: Get bounding box of flyer (fallback to body)
             const rect = await page.evaluate(() => {
-                const el = document.querySelector(".a4");
-                if (!el) return { x: 0, y: 0, width: 0, height: 0 };
+                const el = document.querySelector(".a4") || document.body;
                 const box = el.getBoundingClientRect();
                 return { x: box.x, y: box.y, width: box.width, height: box.height };
             });
 
+            // :seven: Clip screenshot exactly to that region
             const base64Image = await page.screenshot({
                 type: "png",
                 encoding: "base64",
@@ -149,22 +162,30 @@ class AssetsController {
                 omitBackground: false,
             });
 
+            // :eight: Convert Base64 → Binary
+            const buffer = Buffer.from(base64Image, "base64");
+
+            // Optional — save locally
+            const filePath = "flyer-A4.png";
+            fs.writeFileSync(filePath, buffer);
+
             await browser.close();
 
-            const outputPath = "flyer-A4.png";
-            fs.writeFileSync(outputPath, Buffer.from(base64Image, "base64"));
-
             return res.json({
-                status: "success",
-                message: "Rendered flyer to A4 successfully",
+                success: true,
+                message: "Rendered flyer to A4 size successfully",
                 width_px: widthPx,
                 height_px: heightPx,
-                file_saved: outputPath,
+                file_name: filePath,
                 base64: `data:image/png;base64,${base64Image}`,
             });
-        } catch (err) {
-            console.log(" Rendering error:", err);
-            return res.status(500).json({ status: "error", message: err.message });
+        } catch (error) {
+            console.error("Rendering error:", error);
+            if (browser) await browser.close();
+            return res.status(500).json({
+                success: false,
+                message: error.message,
+            });
         }
 
     }
