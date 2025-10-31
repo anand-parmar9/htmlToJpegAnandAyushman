@@ -90,12 +90,24 @@ class AssetsController {
 
             console.log(" Rendering the .a4 flyer container to A4 PNG.");
 
-            const browser = await puppeteer.launch({ headless: true });
+            const browser = await puppeteer.launch({
+                headless: 'new',
+                executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--hide-scrollbars',
+                    '--disable-gpu',
+                    '--full-memory-crash-report'
+                ],
+            });
             const page = await browser.newPage();
 
             await page.setContent(htmlContent, { waitUntil: "networkidle0" });
 
             await page.waitForSelector(".a4", { visible: true });
+            
 
             const widthPx = Math.round(mmToPx(210)); 
             const flyerHeight = await page.evaluate(() => {
