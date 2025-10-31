@@ -177,7 +177,7 @@ class AssetsController {
                 width_px: widthPx,
                 height_px: heightPx,
                 file_name: filePath,
-                base64: `data:image/png;base64,${base64Image}`,
+                base64: `${base64Image}`,
             });
         } catch (error) {
             console.error("Rendering error:", error);
