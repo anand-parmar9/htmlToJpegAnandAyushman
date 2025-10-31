@@ -178,7 +178,7 @@ class AssetsController {
             const page = await browser.newPage();
             const mmToPx = (mm, dpi = 900) => (mm / 25.4) * dpi;
 
-            // :one: Load the HTML
+            // :one: Load the HTMLL
             await page.setContent(html, { waitUntil: "load" });
 
             // :two: Wait for main flyer container (.a4)
