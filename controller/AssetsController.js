@@ -55,7 +55,8 @@ class AssetsController {
         try {
             console.log("🌐 Navigating to URL:", url);
             browser = await puppeteer.launch({
-                headless: true,
+                 headless: true,
+                executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
                 args: ["--no-sandbox", "--disable-setuid-sandbox"],
             });
 
