@@ -1,7 +1,6 @@
 import puppeteer from "puppeteer";
 import fs from 'fs';
 
-
 class AssetsController {
     constructor() { }
 
@@ -42,6 +41,55 @@ class AssetsController {
         return pdfBuffer;
     }
 
+    async scrapeUrls(req,res) {
+        const { url } = req.body;
+
+        if (!url) {
+            return res.status(400).json({
+                status: "error",
+                message: "Missing 'url' in request body",
+            });
+        }
+
+        let browser;
+        try {
+            console.log("🌐 Navigating to URL:", url);
+            browser = await puppeteer.launch({
+                headless: true,
+                args: ["--no-sandbox", "--disable-setuid-sandbox"],
+            });
+
+            const page = await browser.newPage();
+            await page.setDefaultNavigationTimeout(60000);
+
+            // Go to the target URL
+            await page.goto(url, { waitUntil: "networkidle2" });
+
+            // Wait until <body> is loaded
+            await page.waitForSelector("body");
+
+            // Extract the full HTML
+            const html = await page.content();
+
+            console.log("✅ Page loaded successfully");
+
+            await browser.close();
+
+            return res.json({
+                status: "success",
+                message: "Page scraped successfully",
+                pageUrl: url,
+                html,
+            });
+        } catch (err) {
+            console.error("❌ Error scraping page:", err.message);
+            if (browser) await browser.close();
+            return res.status(500).json({
+                status: "error",
+                message: err.message,
+            });
+        }
+    }
     async htmlToJpeg1(req, res) {
         try {
             const { html, type = "png" } = req.body;
@@ -189,6 +237,7 @@ class AssetsController {
         }
 
     }
+    
 
 
     removeNullValues(obj) {
