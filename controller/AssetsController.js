@@ -163,6 +163,7 @@ class AssetsController {
         try {
             browser = await puppeteer.launch({
                 headless: true,
+                protocolTimeout: 120000, // ✅ prevent Runtime.callFunctionOn timed out
                 executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
                 args: [
                     "--no-sandbox",
@@ -180,6 +181,28 @@ class AssetsController {
 
             // :one: Load the HTMLL
             await page.setContent(html, { waitUntil: "load" });
+
+            // ✅ Log failing image URLs (optional but VERY useful)
+            page.on("requestfailed", req => {
+                if (req.resourceType() === "image") {
+                    console.log("❌ IMAGE FAILED:", req.url(), req.failure()?.errorText);
+                }
+            });
+
+            // ✅ Wait for images to load, but max 5 sec per image
+            await page.evaluate(async () => {
+                const timeout = (ms) => new Promise(res => setTimeout(res, ms));
+
+                const imgPromises = Array.from(document.images).map(img => {
+                    if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+                    return Promise.race([
+                        new Promise(res => (img.onload = img.onerror = res)),
+                        timeout(5000) // max wait 5s per image
+                    ]);
+                });
+
+                await Promise.all(imgPromises);
+            });
 
             // :two: Wait for main flyer container (.a4)
             let a4Found = null;
