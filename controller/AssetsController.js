@@ -1,6 +1,5 @@
 import puppeteer from "puppeteer";
 import fs from 'fs';
-import path from "path";
 
 
 class AssetsController {
@@ -91,9 +90,7 @@ class AssetsController {
 
             console.log(" Rendering the .a4 flyer container to A4 PNG.");
 
-            const chromePath = path.resolve("./puppeteer_cache/chrome/linux-131.0.6778.204/chrome-linux64/chrome");
-
-            const browser = await puppeteer.launch({ executablePath: chromePath, headless: true });
+            const browser = await puppeteer.launch({ headless: true });
             const page = await browser.newPage();
 
             await page.setContent(htmlContent, { waitUntil: "networkidle0" });
