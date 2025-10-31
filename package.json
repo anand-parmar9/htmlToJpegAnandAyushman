@@ -4,9 +4,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "index.js",
-    "dev": "npx nodemon --watch src --exec node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"  },
+  "start": "node index.js",
+  "dev": "nodemon index.js",
+  "test": "echo \"Error: no test specified\" && exit 1"
+},
   "author": "",
   "license": "ISC",
   "description": "",
