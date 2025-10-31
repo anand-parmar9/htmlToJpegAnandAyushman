@@ -181,17 +181,6 @@ class AssetsController {
             // :one: Load the HTML
             await page.setContent(html, { waitUntil: "load" });
 
-            // ✅ NEW — wait for all images to load fully
-            await page.evaluate(async () => {
-              const imgs = Array.from(document.images);
-              await Promise.all(
-                imgs.map(img => {
-                  if (img.complete && img.naturalWidth !== 0) return;
-                  return new Promise(resolve => (img.onload = img.onerror = resolve));
-                })
-              );
-            });
-
             // :two: Wait for main flyer container (.a4)
             let a4Found = null;
             try {
