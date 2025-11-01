@@ -230,7 +230,7 @@ class AssetsController {
             await page.setViewport({
                 width: widthPx,
                 height: heightPx,
-                deviceScaleFactor: 1,
+                deviceScaleFactor: 3,
             });
 
             // :five: Ensure white background
