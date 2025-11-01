@@ -179,7 +179,7 @@ class AssetsController {
             const mmToPx = (mm, dpi = 900) => (mm / 25.4) * dpi;
 
             // :one: Load the HTML
-            await page.setContent(html, { waitUntil: "networkidle0" });
+            await page.setContent(html, { waitUntil: "load" });
 
             // :two: Wait for main flyer container (.a4)
             let a4Found = null;
