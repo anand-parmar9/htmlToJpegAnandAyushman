@@ -54,15 +54,18 @@ class AssetsController {
 
     async scrapeUrls(req, res) {
         const { url: propertyUrl } = req.body;
+
         if (!propertyUrl) {
             return res.status(400).json({
                 status: "error",
                 message: "Missing 'url' in request body",
             });
         }
+
         let browser;
         try {
             console.log(":globe_with_meridians: Navigating to URL:", propertyUrl);
+
             browser = await puppeteer.launch({
                 headless: true,
                 executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
@@ -75,35 +78,41 @@ class AssetsController {
                     "--disable-gpu",
                 ]
             });
+
             const page = await browser.newPage();
             await page.setDefaultNavigationTimeout(60000);
+
             const allImages = new Set();
             const allVideos = new Set();
+
             // --- Monitor Network Requests (Images / Videos / JSON/XHR) ---
             page.on("response", async (response) => {
                 try {
                     const req = response.request();
                     const resUrl = req.url();
-                    // Direct media detection
+
                     if (resUrl.match(/\.(jpg|jpeg|png|gif|webp|avif)$/i))
                         allImages.add(resUrl.split("?")[0]);
+
                     if (resUrl.match(/(youtube\.com|youtu\.be|vimeo\.com|\.mp4|\.mov|\.m3u8)/i))
                         allVideos.add(resUrl.split("?")[0]);
-                    // Parse JSON/XHR responses
+
                     if (["xhr", "fetch"].includes(req.resourceType())) {
                         const text = await response.text();
-                        // Extract images
+
                         [...text.matchAll(/https?:\/\/[^"'\s>]+?\.(jpg|jpeg|png|gif|webp|avif)/gi)]
                             .forEach((m) => allImages.add(m[0]));
-                        // Extract videos
+
                         [...text.matchAll(/https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/)[A-Za-z0-9_\-?=]+/gi)]
                             .forEach((m) => allVideos.add(m[0]));
                     }
                 } catch { }
             });
+
             // --- Open Page ---
             await page.goto(propertyUrl, { waitUntil: "networkidle2" });
-            // --- Scroll to Load Lazy Images ---
+
+            // --- Scroll to Trigger Lazy Loads ---
             await page.evaluate(async () => {
                 await new Promise((resolve) => {
                     let total = 0;
@@ -118,28 +127,54 @@ class AssetsController {
                     }, 250);
                 });
             });
-            // --- Collect DOM Media, Text & HTML ---
+
+            // --- ✅ FIX: Patch <img> src using data-src before extracting HTML ---
+            await page.evaluate(() => {
+                document.querySelectorAll("img").forEach(img => {
+                    let realSrc =
+                        img.getAttribute("data-src") ||
+                        img.getAttribute("data-original") ||
+                        img.getAttribute("data-lazy-src");
+
+                    if (realSrc) {
+                        // Convert l-view → l-mini to match expected src format
+                        if (realSrc.includes("l-view")) {
+                            realSrc = realSrc.replace("l-view", "l-mini");
+                        }
+                        img.src = realSrc;
+                    }
+                });
+            });
+
+            // --- Collect DOM Media, Text & HTML AFTER patching ---
             const domData = await page.evaluate(() => {
                 const imgs = Array.from(document.querySelectorAll("img"))
                     .flatMap((i) => [i.src, i.dataset.src, i.dataset.original, i.currentSrc])
                     .filter(Boolean);
+
                 const bgImgs = Array.from(document.querySelectorAll("*"))
                     .map((el) => getComputedStyle(el).backgroundImage)
                     .filter((b) => b && b.startsWith("url("))
                     .map((b) => b.slice(4, -1).replace(/["']/g, ""));
+
                 const iframes = Array.from(document.querySelectorAll("iframe"))
                     .map((f) => f.src)
                     .filter((u) => u && /(youtube\.com|youtu\.be|vimeo\.com)/i.test(u));
+
                 const videos = Array.from(document.querySelectorAll("video source"))
                     .map((v) => v.src)
                     .filter(Boolean);
+
                 const pageText = document.body.innerText || "";
                 const pageHTML = document.documentElement.outerHTML || "";
+
                 return { imgs, bgImgs, iframes, videos, pageText, pageHTML };
             });
+
             [...domData.imgs, ...domData.bgImgs].forEach((u) => allImages.add(u));
             [...domData.iframes, ...domData.videos].forEach((u) => allVideos.add(u));
-            // --- Extract Embed YouTube URLs ---
+
+            // --- Extract Embed Videos ---
             const embedVideos = await page.evaluate(() => {
                 const urls = new Set();
                 document.querySelectorAll("[data-embed-url]").forEach((el) => {
@@ -152,22 +187,29 @@ class AssetsController {
                 });
                 return [...urls];
             });
+
             embedVideos.forEach((u) => allVideos.add(u));
-            // --- Extract Media from <script> tags ---
+
+            // --- Extract Images & Videos Inside <script> Tags ---
             const embedded = await page.evaluate(() => {
                 const scripts = Array.from(document.querySelectorAll("script")).map((s) => s.innerText);
+
                 const imageMatches = scripts.flatMap((t) =>
                     [...t.matchAll(/https?:\/\/[^"'\s>]+?\.(jpg|jpeg|png|gif|webp|avif)/gi)]
                         .map((m) => m[0])
                 );
+
                 const videoMatches = scripts.flatMap((t) =>
                     [...t.matchAll(/https?:\/\/[^"'\s>]+?(youtube\.com|youtu\.be|vimeo\.com|\.mp4|\.mov)/gi)]
                         .map((m) => m[0])
                 );
+
                 return { imageMatches, videoMatches };
             });
+
             embedded.imageMatches.forEach((u) => allImages.add(u));
             embedded.videoMatches.forEach((u) => allVideos.add(u));
+
             // --- URL Normalizers ---
             function normalize(url) {
                 if (!url) return null;
@@ -178,20 +220,24 @@ class AssetsController {
                     return null;
                 }
             }
+
             function normalizeYouTube(link) {
                 const idMatch = link.match(/(?:embed\/|v=|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
                 return idMatch ? `https://www.youtube.com/watch?v=${idMatch[1]}` : normalize(link);
             }
+
             const cleanImages = [...allImages]
                 .map(normalize)
                 .filter(Boolean)
                 .filter((v, i, arr) => arr.indexOf(v) === i);
+
             const cleanVideos = [...allVideos]
                 .map(normalizeYouTube)
                 .filter(Boolean)
                 .filter((v, i, arr) => arr.indexOf(v) === i);
+
             await browser.close();
-            // --- Final Response (n8n style) ---
+
             return res.json({
                 status: "success",
                 data: {
@@ -204,6 +250,7 @@ class AssetsController {
                     videos: cleanVideos,
                 },
             });
+
         } catch (err) {
             console.error(":x: Error scraping page:", err.message);
             if (browser) await browser.close();
