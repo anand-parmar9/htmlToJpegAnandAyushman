@@ -17,10 +17,12 @@ switch (NODE_ENVIRMENT) {
         dotenv.config({ path: '.envprod', override: true });
         break;
 }
-const app=express();
+const app = express();
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));//
 //app.use(express.text({ type: '*/*' }));
+app.use(express.text({ type: "text/html", limit: "10mb" }));
+
 app.use(bodyParser.json());
 app.use(async (err, req, res, next) => {
 
@@ -55,7 +57,7 @@ process.on('unhandledRejection', (reason, req, res) => {
     throw reason;
 });
 app.use('/api/v1/', apiRoutes);
-app.use('/', (req, res, next) => {    
+app.use('/', (req, res, next) => {
     res.send('' + Date.now());
 });
 // routes end

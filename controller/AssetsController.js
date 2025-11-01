@@ -150,8 +150,11 @@ class AssetsController {
 
     async htmlToJpeg(req, res) {
         console.log("Rendering the .a4 flyer container to A4 PNG...");
-        const html = req.body?.html;
+        //const html = req.body?.html;
+        console.log("Received body:", typeof req.body, req.body);
 
+        // Accept both JSON or plain HTML
+        const html = typeof req.body === "string" ? req.body : req.body?.html;
         if (!html) {
             return res.status(400).json({
                 success: false,
@@ -163,6 +166,7 @@ class AssetsController {
         try {
             browser = await puppeteer.launch({
                 headless: true,
+                protocolTimeout: 120000, // ✅ prevent Runtime.callFunctionOn timed out
                 executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
                 args: [
                     "--no-sandbox",
@@ -178,8 +182,30 @@ class AssetsController {
             const page = await browser.newPage();
             const mmToPx = (mm, dpi = 900) => (mm / 25.4) * dpi;
 
-            // :one: Load the HTML
+            // :one: Load the HTMLL
             await page.setContent(html, { waitUntil: "load" });
+
+            // ✅ Log failing image URLs (optional but VERY useful)
+            page.on("requestfailed", req => {
+                if (req.resourceType() === "image") {
+                    console.log("❌ IMAGE FAILED:", req.url(), req.failure()?.errorText);
+                }
+            });
+
+            // ✅ Wait for images to load, but max 5 sec per image
+            await page.evaluate(async () => {
+                const timeout = (ms) => new Promise(res => setTimeout(res, ms));
+
+                const imgPromises = Array.from(document.images).map(img => {
+                    if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+                    return Promise.race([
+                        new Promise(res => (img.onload = img.onerror = res)),
+                        timeout(5000) // max wait 5s per image
+                    ]);
+                });
+
+                await Promise.all(imgPromises);
+            });
 
             // :two: Wait for main flyer container (.a4)
             let a4Found = null;
