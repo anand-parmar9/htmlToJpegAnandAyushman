@@ -121,7 +121,7 @@ class AssetsController {
             // --- Collect DOM Media, Text & HTML ---
             const domData = await page.evaluate(() => {
                 const imgs = Array.from(document.querySelectorAll("img"))
-                    .flatMap((i) => [i.src, i.dataset.src, i.dataset.original, i.currentSrc])
+                    .flatMap((i) => [i.src, i.data-src, i.dataset.src, i.dataset.original, i.currentSrc])
                     .filter(Boolean);
                 const bgImgs = Array.from(document.querySelectorAll("*"))
                     .map((el) => getComputedStyle(el).backgroundImage)
