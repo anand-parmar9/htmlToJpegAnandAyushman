@@ -6,7 +6,7 @@ class AssetsController {
 
 
     async convertHtmlToPdf(htmlContent, res) {
-        // Launch browser
+        // Launch-browser
 
         const browser = await puppeteer.launch({
             headless: true,
