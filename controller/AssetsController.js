@@ -53,6 +53,131 @@ class AssetsController {
     }
 
     async scrapeUrls(req, res) {
+        const { url: propertyUrl } = req.body;
+
+        if (!propertyUrl) {
+            return res.status(400).json({
+                status: "error",
+                message: "Missing 'url' in request body",
+            });
+        }
+
+        let browser;
+        try {
+            console.log("🌐 Navigating to URL:", propertyUrl);
+
+            browser = await puppeteer.launch({
+                headless: true,
+                executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
+                args: [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-web-security",
+                ],
+            });
+
+            const page = await browser.newPage();
+            await page.setDefaultNavigationTimeout(60000);
+
+            // --- Start scraping ---
+            const allImages = new Set();
+            const allVideos = new Set();
+
+            // Watch network requests
+            page.on("response", async (response) => {
+                try {
+                    const req = response.request();
+                    const resUrl = req.url();
+
+                    // Match media files
+                    if (resUrl.match(/\.(jpg|jpeg|png|gif|webp|avif)$/i))
+                        allImages.add(resUrl.split("?")[0]);
+
+                    if (resUrl.match(/(youtube\.com|youtu\.be|vimeo\.com|\.mp4|\.mov|\.m3u8)/i))
+                        allVideos.add(resUrl.split("?")[0]);
+                } catch { }
+            });
+
+            console.log("⏳ Loading page...");
+            await page.goto(propertyUrl, { waitUntil: "networkidle2" });
+
+            // Scroll to load lazy content
+            await page.evaluate(async () => {
+                await new Promise((resolve) => {
+                    let total = 0;
+                    const step = 400;
+                    const timer = setInterval(() => {
+                        window.scrollBy(0, step);
+                        total += step;
+                        if (total >= document.body.scrollHeight) {
+                            clearInterval(timer);
+                            resolve();
+                        }
+                    }, 200);
+                });
+            });
+
+            console.log("🔍 Extracting content...");
+            const domData = await page.evaluate(() => {
+                const imgs = Array.from(document.querySelectorAll("img"))
+                    .map((i) => i.src)
+                    .filter(Boolean);
+
+                const videos = Array.from(document.querySelectorAll("video source"))
+                    .map((v) => v.src)
+                    .filter(Boolean);
+
+                const iframes = Array.from(document.querySelectorAll("iframe"))
+                    .map((f) => f.src)
+                    .filter((u) => /(youtube|vimeo)/i.test(u));
+
+                const pageText = document.body.innerText?.slice(0, 20000);
+                const pageHTML = document.documentElement.outerHTML;
+
+                return { imgs, videos, iframes, pageText, pageHTML };
+            });
+
+            // Combine results
+            [...domData.imgs].forEach((u) => allImages.add(u));
+            [...domData.videos, ...domData.iframes].forEach((u) => allVideos.add(u));
+
+            const normalize = (url) => {
+                try {
+                    const u = new URL(url, propertyUrl);
+                    return u.href.split("?")[0];
+                } catch {
+                    return null;
+                }
+            };
+
+            const cleanImages = [...allImages].map(normalize).filter(Boolean);
+            const cleanVideos = [...allVideos].map(normalize).filter(Boolean);
+
+            await browser.close();
+
+            return res.json({
+                status: "success",
+                data: {
+                    property_url: propertyUrl,
+                    image_count: cleanImages.length,
+                    video_count: cleanVideos.length,
+                    images: cleanImages,
+                    videos: cleanVideos,
+                    page_text: domData.pageText,
+                },
+            });
+        } catch (err) {
+            console.error("❌ Error scraping page:", err.message);
+            if (browser) await browser.close();
+            return res.status(500).json({
+                status: "error",
+                message: err.message,
+            });
+        }
+    }
+    async scrapeUrls1(req, res) {
         const { url } = req.body;
 
         if (!url) {
