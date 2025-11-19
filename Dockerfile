@@ -19,7 +19,7 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN npm ci --omit=dev
 # Copy app source
 COPY . .
-# ---------- Chrome install ----------
+# ---------- Chrome install -----------
 # Download Chrome manually inside the image
 RUN npx puppeteer browsers install chrome
 # ---------- Runtime ----------
