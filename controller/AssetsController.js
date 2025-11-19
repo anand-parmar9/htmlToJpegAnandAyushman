@@ -8,7 +8,18 @@ class AssetsController {
     async convertHtmlToPdf(htmlContent, res) {
         // Launch-browser
 
-        const browser = await puppeteer.launch({headless: true, executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome'})
+        const browser = await puppeteer.launch({
+            headless: true, 
+            executablePath: '/root/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome',
+            args: [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-web-security",
+                    "--allow-running-insecure-content",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                ]
+        })
 
         const page = await browser.newPage();
 
